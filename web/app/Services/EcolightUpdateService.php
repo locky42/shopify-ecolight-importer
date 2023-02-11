@@ -5,13 +5,27 @@ namespace App\Services;
 use App\Models\Session;
 use App\Models\Products;
 use Shopify\Clients\Graphql;
-use App\Helpers\ProductToUpdateFields;
+use Shopify\Exception\HttpRequestException;
+use Shopify\Exception\MissingArgumentException;
+use Shopify\Exception\RestResourceException;
+use Shopify\Rest\Admin2023_01\Product;
+use Shopify\Rest\Admin2023_01\Variant;
+use  Shopify\Auth\Session as AuthSession;
 
 class EcolightUpdateService
 {
+    protected array $config = [];
+    protected ApiProducts $apiProductsService;
+
+    public function __construct()
+    {
+        $this->config = config('services.ecolightUpdate');
+        $this->apiProductsService = new ApiProducts();
+    }
 
     public function getProducts(): array
     {
+//        return $this->apiProductsService->getProducts(2);
         return [
             [
                 "title"        => "New Test Product",
@@ -22,113 +36,139 @@ class EcolightUpdateService
                 "variants"     => [
                     [
                         "sku"     => "t_009",
+                        "option1" => "First_3",
+                        "option2" => "Second",
                         "price"   => 30.00,
                         "grams"   => 300,
                         "taxable" => false,
+                    ],
+                ],
+                "options" => [
+                    [
+                        "name" => "Size"
+                    ],
+                    [
+                        "name" => "Color"
                     ]
-                ]
+                ],
             ]
         ];
     }
 
-    public function getShopifyProduct($sku)
-    {
-        return Products::where('product_sku', '=', $sku)->first();
-    }
-
-    public function import()
+    /**
+     * @return void
+     * @throws HttpRequestException
+     * @throws MissingArgumentException
+     * @throws RestResourceException
+     */
+    public function import(): void
     {
         $sessionModel = new Session();
         $sessions = $sessionModel::all();
 
         foreach ($sessions as $session) {
-            $sessionArray = $session->toArray();
             foreach ($this->getProducts() as $product) {
+                if (is_object($product)) {
+                    $product = $product->toArray();
+                }
+
                 $productHash = md5(serialize($product));
                 foreach ($product['variants'] as $variant) {
-                    $sku = $variant['sku'];
-                    $localProduct = $this->getShopifyProduct($sku);
+                    $sku = $variant['variantSku'] ?? $variant['sku'];
+                    $localProduct = Products::getShopifyProduct($sku);
                     $localProductArray = $localProduct?->toArray();
                     if ($localProductArray) {
                         if ($localProductArray['product_hash'] == $productHash) {
                             echo 'Product ' . $localProductArray['product_id'] . ' already exist' . PHP_EOL;
                         } else {
                             $productId = $localProductArray['product_id'];
-                            $result = $this->sendUpdateProduct($product, $productId, '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',  $sessionArray['shop']);
-                            $this->addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
+                            $result = $this->sendProduct($product, $session, $productId);
+                            if (isset($result->errors)) {
+                                var_dump($result);
+                                die;
+                            }
+                            Products::addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
                         }
                     } else {
-                        $result = $this->sendProduct(['product' => $product], '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',  $sessionArray['shop']);
-                        $productId = $result?->product?->id;
-                        if ($result?->product?->id) {
-                            $this->addWriteLocalProduct($sku, $productId, $productHash);
+                        $result = $this->sendProduct($product, $session);
+
+                        $productId = $result?->id;
+                        if ($productId) {
+                            Products::addWriteLocalProduct($sku, $productId, $productHash);
                         }
                     }
                 }
             }
-
             break;
         }
     }
 
     /**
-     * @param $sku
+     * @param $product
+     * @param $session
      * @param $productId
-     * @param $hash
-     * @param $localProduct
-     * @return bool
+     * @return Product
+     * @throws HttpRequestException
+     * @throws MissingArgumentException
+     * @throws RestResourceException
      */
-    protected function addWriteLocalProduct($sku, $productId, $hash, $localProduct = null): bool
+    protected function sendProduct($product, $session, $productId = null): Product
     {
-        $product = $localProduct ?? new Products();
-        $product->product_id = $productId;
-        $product->product_sku = $sku;
-        $product->product_hash = $hash;
-        return $product->save();
+        $session = new AuthSession($session->id, $session->shop, $session->is_online, $session->state);
+        $session->setAccessToken($this->config['api_key']);
+        $shopifyProduct = new Product($session);
+        if ($productId) {
+            $shopifyProduct->id = $productId;
+        } else {
+            $shopifyProduct->id = $this->getShopifyProductIdByVariantsBySku($product['variants'][0]['sku'] , $session);
+        }
+        $shopifyProduct->title = $product['title'];
+        $shopifyProduct->body_html = $product['body_html'];
+        $shopifyProduct->vendor = $product['vendor'];
+        $shopifyProduct->product_type = $product['product_type'];
+        $shopifyProduct->variants = $product['variants'];
+        $shopifyProduct->options = $product['options'];
+        if (!$product['published']) {
+            $shopifyProduct->status = 'draft';
+        }
+
+        $shopifyProduct->saveAndUpdate();
+        return $shopifyProduct;
     }
 
-    protected function sendProduct($products, $API_KEY, $SHOP_URL)
+    /**
+     * @param $sku
+     * @param $session
+     * @return false|int|null
+     * @throws HttpRequestException
+     * @throws MissingArgumentException
+     */
+    protected function getShopifyProductIdByVariantsBySku($sku, $session)
     {
-        $SHOPIFY_API = "https://$SHOP_URL/admin/api/2023-01/products.json";
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $SHOPIFY_API);
-        $headers = array(
-            'Content-Type: application/json',
-            "X-Shopify-Access-Token: $API_KEY"
-        );
-        curl_setopt($curl, CURLOPT_HTTPHEADER,$headers);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_VERBOSE, 0);
-        curl_setopt($curl, CURLOPT_HEADER, 0);
-        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($products));
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-
-        $response = curl_exec ($curl);
-        curl_close ($curl);
-
-        return json_decode($response);
-    }
-
-    protected function sendUpdateProduct($product, $productId, $API_KEY, $SHOP_URL)
-    {
-
-        $client = new Graphql($SHOP_URL, $API_KEY);
-
-        $productPartQuery = ProductToUpdateFields::getQueryPart($product);
+        $client = new Graphql($session->shop, $this->config['api_key']);
 
         $query = <<<QUERY
-          mutation {
-            productUpdate(input: {id: "gid://shopify/Product/$productId", $productPartQuery}) {
-              product {
-                id
-              }
+            query {
+                productVariants(first: 1, query: "sku:$sku") {
+                    edges {
+                        node {
+                            id
+                        }
+                    }
+                }
             }
-          }
         QUERY;
         $response = $client->query(["query" => $query])->getBody()->getContents();
 
-        return json_decode($response);
+        $productId = false;
+        foreach (json_decode($response)?->data?->productVariants?->edges as $variant) {
+            $parts = explode('/', $variant->node->id);
+            $variantId = end($parts);
+            $shopifyVariant = Variant::find($session, $variantId,);
+            $productId = $shopifyVariant->product_id;
+            break;
+        }
+
+        return $productId;
     }
 }

@@ -30,4 +30,13 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'ecolightUpdate' => [
+        'api_key' => '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',
+    ],
+
+    'api_connector' => [
+        'url' => 'https://ecolightdiamond.in/API/StockSearch',
+        'APIToken' => '52f2e6ee-1730-47d7-ba8c-814a7ff080d0'
+    ],
+
 ];
