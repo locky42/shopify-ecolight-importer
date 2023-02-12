@@ -2,57 +2,89 @@
 
 namespace App\Services;
 
+use App\Models\Option;
+use App\Helpers\Api\Image;
+use App\Helpers\Api\Variant;
+use App\Helpers\Api\Collection;
+use App\Helpers\Config;
 use App\Models\Session;
 use App\Models\Products;
-use Shopify\Clients\Graphql;
+use App\Models\ShopifyProduct;
 use Shopify\Exception\HttpRequestException;
 use Shopify\Exception\MissingArgumentException;
 use Shopify\Exception\RestResourceException;
+use Shopify\Exception\RestResourceRequestException;
 use Shopify\Rest\Admin2023_01\Product;
-use Shopify\Rest\Admin2023_01\Variant;
 use  Shopify\Auth\Session as AuthSession;
+use  App\Helpers\Api\Session as SessionHelper;
 
 class EcolightUpdateService
 {
-    protected array $config = [];
     protected ApiProducts $apiProductsService;
 
     public function __construct()
     {
-        $this->config = config('services.ecolightUpdate');
+        Config::setConfig(config('services.ecolightUpdate'));
         $this->apiProductsService = new ApiProducts();
     }
 
+    /**
+     * @return array
+     */
     public function getProducts(): array
     {
-//        return $this->apiProductsService->getProducts(2);
-        return [
-            [
-                "title"        => "New Test Product",
-                "body_html"    => "<strong>Description!</strong>",
-                "vendor"       => "DC",
-                "product_type" => "Test",
-                "published"    => true ,
-                "variants"     => [
+        /**
+         * @var $apiProduct ShopifyProduct
+         * @var $option Option
+         */
+
+        $apiProducts = $this->apiProductsService->getProducts(20);
+        $products = [];
+
+        foreach ($apiProducts as $apiProduct) {
+            $variantsOptions = [];
+            $options = [];
+
+            foreach ($apiProduct->options as $iteration => $option) {
+                if ($option->value) {
+                    $variantsOptions["option" . $iteration + 1] = $option->value;
+                    $options[] = ['name' => $option->name];
+                }
+            }
+
+            $variants = [
+                array_merge([
+                    "sku"     => $apiProduct->variantSku,
+                    "price"   => $apiProduct->variantPrice,
+                    "grams"   => $apiProduct->variantGrams,
+                    "taxable" => $apiProduct->variantTaxable,
+                ], $variantsOptions),
+            ];
+
+            $product = [
+                'title' => $apiProduct->title,
+                'body_html' => $apiProduct->bodyHtml,
+                'seo_title' => $apiProduct->seoTitle,
+                'seo_description' => $apiProduct->seoDescription,
+                'handle' => $apiProduct->handle,
+                'vendor' => $apiProduct->vendor,
+                'product_type' => $apiProduct->customProductType,
+                'published' => $apiProduct->status == $apiProduct::STATUS_ACTIVE,
+                'variants' => $variants,
+                'options' => $options,
+                'collection' => $apiProduct->collection,
+                'images' => [
                     [
-                        "sku"     => "t_009",
-                        "option1" => "First_3",
-                        "option2" => "Second",
-                        "price"   => 30.00,
-                        "grams"   => 300,
-                        "taxable" => false,
-                    ],
-                ],
-                "options" => [
-                    [
-                        "name" => "Size"
-                    ],
-                    [
-                        "name" => "Color"
+                        'src' => $apiProduct->imageSrc,
+                        'alt' => $apiProduct->imageAltText
                     ]
                 ],
-            ]
-        ];
+            ];
+
+            $products[] = $product;
+        }
+
+        return $products;
     }
 
     /**
@@ -60,6 +92,7 @@ class EcolightUpdateService
      * @throws HttpRequestException
      * @throws MissingArgumentException
      * @throws RestResourceException
+     * @throws RestResourceRequestException
      */
     public function import(): void
     {
@@ -67,6 +100,9 @@ class EcolightUpdateService
         $sessions = $sessionModel::all();
 
         foreach ($sessions as $session) {
+            $authSession = new AuthSession($session->id, $session->shop, $session->is_online ?? $session->isOnline, $session->state);
+            $authSession->setAccessToken(Config::get('api_key'));
+            SessionHelper::setSession($authSession);
             foreach ($this->getProducts() as $product) {
                 if (is_object($product)) {
                     $product = $product->toArray();
@@ -79,20 +115,21 @@ class EcolightUpdateService
                     $localProductArray = $localProduct?->toArray();
                     if ($localProductArray) {
                         if ($localProductArray['product_hash'] == $productHash) {
-                            echo 'Product ' . $localProductArray['product_id'] . ' already exist' . PHP_EOL;
+                            echo 'Product ' . $localProductArray['product_sku'] . ' (' . $localProductArray['product_id'] . ') already exist' . PHP_EOL;
                         } else {
                             $productId = $localProductArray['product_id'];
-                            $result = $this->sendProduct($product, $session, $productId);
+                            $result = $this->sendProduct($product, $productId);
                             if (isset($result->errors)) {
+                                // TODO: add log error
                                 var_dump($result);
                                 die;
                             }
                             Products::addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
                         }
                     } else {
-                        $result = $this->sendProduct($product, $session);
+                        $result = $this->sendProduct($product);
 
-                        $productId = $result?->id;
+                        $productId = $result->id;
                         if ($productId) {
                             Products::addWriteLocalProduct($sku, $productId, $productHash);
                         }
@@ -105,70 +142,48 @@ class EcolightUpdateService
 
     /**
      * @param $product
-     * @param $session
      * @param $productId
      * @return Product
      * @throws HttpRequestException
      * @throws MissingArgumentException
      * @throws RestResourceException
+     * @throws RestResourceRequestException
      */
-    protected function sendProduct($product, $session, $productId = null): Product
+    protected function sendProduct($product, $productId = null): Product
     {
-        $session = new AuthSession($session->id, $session->shop, $session->is_online, $session->state);
-        $session->setAccessToken($this->config['api_key']);
-        $shopifyProduct = new Product($session);
+        $shopifyProduct = new Product(SessionHelper::get());
+        $productId = $productId ? : Variant::getShopifyProductIdByVariantsBySku($product['variants'][0]['sku']);
         if ($productId) {
             $shopifyProduct->id = $productId;
-        } else {
-            $shopifyProduct->id = $this->getShopifyProductIdByVariantsBySku($product['variants'][0]['sku'] , $session);
         }
+
         $shopifyProduct->title = $product['title'];
         $shopifyProduct->body_html = $product['body_html'];
         $shopifyProduct->vendor = $product['vendor'];
         $shopifyProduct->product_type = $product['product_type'];
         $shopifyProduct->variants = $product['variants'];
         $shopifyProduct->options = $product['options'];
+        $shopifyProduct->handle = $product['handle'];
+        $shopifyProduct->metafields_global_title_tag = $product['seo_title'];
+        $shopifyProduct->metafields_global_description_tag = $product['seo_description'];
         if (!$product['published']) {
             $shopifyProduct->status = 'draft';
         }
 
-        $shopifyProduct->saveAndUpdate();
-        return $shopifyProduct;
-    }
-
-    /**
-     * @param $sku
-     * @param $session
-     * @return false|int|null
-     * @throws HttpRequestException
-     * @throws MissingArgumentException
-     */
-    protected function getShopifyProductIdByVariantsBySku($sku, $session)
-    {
-        $client = new Graphql($session->shop, $this->config['api_key']);
-
-        $query = <<<QUERY
-            query {
-                productVariants(first: 1, query: "sku:$sku") {
-                    edges {
-                        node {
-                            id
-                        }
-                    }
-                }
+        try {
+            $shopifyProduct->saveAndUpdate();
+        } catch (RestResourceRequestException $exception) {
+            if ($exception->getMessage() == 'REST request failed: "Not Found"' && $productId) {
+                Products::getShopifyProductById($productId)?->delete();
+                $this->sendProduct($product);
+            } else {
+                throw $exception;
             }
-        QUERY;
-        $response = $client->query(["query" => $query])->getBody()->getContents();
-
-        $productId = false;
-        foreach (json_decode($response)?->data?->productVariants?->edges as $variant) {
-            $parts = explode('/', $variant->node->id);
-            $variantId = end($parts);
-            $shopifyVariant = Variant::find($session, $variantId,);
-            $productId = $shopifyVariant->product_id;
-            break;
         }
 
-        return $productId;
+        Collection::setProductCollection($shopifyProduct, $product);
+        Image::setProductImages($shopifyProduct, $product);
+
+        return $shopifyProduct;
     }
 }

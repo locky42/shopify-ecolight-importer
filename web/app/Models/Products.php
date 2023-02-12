@@ -19,6 +19,15 @@ class Products extends Model
     }
 
     /**
+     * @param $id
+     * @return mixed
+     */
+    public static function getShopifyProductById($id)
+    {
+        return self::where('product_id', '=', $id)->first();
+    }
+
+    /**
      * @param $sku
      * @param $productId
      * @param $hash
