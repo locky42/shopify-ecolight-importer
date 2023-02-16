@@ -18,7 +18,7 @@ class Variant
      */
     public static function getShopifyProductIdByVariantsBySku($sku): bool|int|null
     {
-        $client = new Graphql(Session::get()->shop, Config::get('api_key'));
+        $client = new Graphql(Session::get()->shop, Session::get()->getAccessToken());
 
         $query = <<<QUERY
             query {

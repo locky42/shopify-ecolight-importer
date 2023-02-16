@@ -4,6 +4,10 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\EcolightUpdateService;
+use Shopify\Exception\HttpRequestException;
+use Shopify\Exception\MissingArgumentException;
+use Shopify\Exception\RestResourceException;
+use Shopify\Exception\RestResourceRequestException;
 
 class UpdateProducts extends Command
 {
@@ -32,14 +36,18 @@ class UpdateProducts extends Command
     }
 
     /**
-     * Execute the console command.
-     *
      * @return int
+     * @throws HttpRequestException
+     * @throws MissingArgumentException
+     * @throws RestResourceException
+     * @throws RestResourceRequestException
      */
-    public function handle()
+    public function handle(): int
     {
+//        throw new Exception('test1');
         $updateService = new EcolightUpdateService();
-        var_dump($updateService->import());
+        $updateService->import();
+
         return 0;
     }
 }

@@ -7,6 +7,7 @@ use App\Helpers\SeoApiMeta;
 use App\Helpers\ProductChecker;
 use App\Helpers\PriceHelper;
 use App\Models\ShopifyProduct;
+use Illuminate\Support\Facades\Log;
 
 class ApiProducts
 {
@@ -33,6 +34,9 @@ class ApiProducts
     public function getProducts(?int $count = null): array
     {
         $apiProducts = $this->connector->getProducts();
+
+        Log::info('Get all products from API (' . count($apiProducts) . ')');
+
         $products = [];
         $iteration = 0;
         foreach ($apiProducts as $apiProduct) {
@@ -70,6 +74,8 @@ class ApiProducts
                     ->setOptions($this->generateOptions($apiProduct));
                 $products[] = $product;
                 ++$iteration;
+            } else {
+                Log::info('Skip product ' . $apiProduct->Stone_NO . ' (no valid conditions)');
             }
         }
         return $products;

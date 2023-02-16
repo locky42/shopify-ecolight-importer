@@ -36,13 +36,13 @@ return [
     'mailers' => [
         'smtp' => [
             'transport' => 'smtp',
-            'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
-            'port' => env('MAIL_PORT', 587),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
-            'username' => env('MAIL_USERNAME'),
-            'password' => env('MAIL_PASSWORD'),
+            'host' => env('MAIL_HOST', 'microsp.01g.info'),
+            'port' => env('MAIL_PORT', 465),
+            'encryption' => env('MAIL_ENCRYPTION', 'ssl'),
+            'username' => env('info@microsp.01g.info'),
+            'password' => env('Lz6Bu79k3HMK33BT2!#^&eQ'),
             'timeout' => null,
-            'auth_mode' => null,
+            'auth_mode' => true,
         ],
 
         'ses' => [
@@ -84,8 +84,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'info@luxury-diamonds.com'),
+        'name' => env('MAIL_FROM_NAME', 'Luxury Diamonds Info'),
     ],
 
     /*

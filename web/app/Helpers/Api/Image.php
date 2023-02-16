@@ -6,6 +6,7 @@ use Exception;
 use Shopify\Exception\RestResourceException;
 use Shopify\Rest\Admin2023_01\Image as CoreImage;
 use Shopify\Rest\Admin2023_01\Product;
+use App\Exceptions\ExceptionToMail;
 
 class Image
 {
@@ -14,6 +15,7 @@ class Image
      * @param array $productData
      * @return void
      * @throws RestResourceException
+     * @throws ExceptionToMail
      */
     public static function setProductImages(Product $shopifyProduct, array $productData): void
     {
@@ -25,14 +27,12 @@ class Image
             $image->position = $iteration + 1;
             $image->alt = $imageData['alt'] ?? '';
             $image->src = $imageData['src'];
-            if ($image->src) {
-                try {
-                    $image->save(
-                        true
-                    );
-                } catch (Exception $e) {
-                    // TODO: add log errors
+            try {
+                if ($image->src) {
+                    $image->save(true);
                 }
+            } catch (Exception $exception) {
+                throw new ExceptionToMail('Import image error (product ' . $productData['title'] . '): ' . $exception->getMessage());
             }
         }
     }

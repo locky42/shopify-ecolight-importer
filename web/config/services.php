@@ -31,7 +31,7 @@ return [
     ],
 
     'ecolightUpdate' => [
-        'api_key' => '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',
+//        'api_key' => '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',
     ],
 
     'api_connector' => [
