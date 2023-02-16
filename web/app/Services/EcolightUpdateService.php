@@ -20,7 +20,6 @@ use Shopify\Rest\Admin2023_01\Product;
 use Shopify\Auth\Session as AuthSession;
 use App\Helpers\Api\Session as SessionHelper;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class EcolightUpdateService
 {
@@ -28,6 +27,7 @@ class EcolightUpdateService
 
     public function __construct()
     {
+        Log::info('Import START');
         $this->apiProductsService = new ApiProducts();
     }
 
@@ -212,6 +212,7 @@ class EcolightUpdateService
 
     public function __destruct()
     {
+        Log::info('Import END');
         print_r(Error::getErrors());
     }
 }
