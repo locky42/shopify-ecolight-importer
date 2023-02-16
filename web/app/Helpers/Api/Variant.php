@@ -6,7 +6,6 @@ use Shopify\Clients\Graphql;
 use Shopify\Exception\HttpRequestException;
 use Shopify\Exception\MissingArgumentException;
 use Shopify\Rest\Admin2023_01\Variant as CoreVariant;
-use App\Helpers\Config;
 
 class Variant
 {

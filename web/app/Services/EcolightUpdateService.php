@@ -8,7 +8,6 @@ use App\Models\Option;
 use App\Helpers\Api\Image;
 use App\Helpers\Api\Variant;
 use App\Helpers\Api\Collection;
-use App\Helpers\Config;
 use App\Helpers\Error;
 use App\Models\Session;
 use App\Models\Products;
@@ -29,13 +28,6 @@ class EcolightUpdateService
 
     public function __construct()
     {
-        // TODO: fix this
-        $mailService = new MailService();
-        Log::info('test message');
-        $mailService->html('<h1>Test</h1>');
-        Mail::to('zinchenko.m.42@gmail.com')->send($mailService);
-        die;
-        Config::setConfig(config('services.ecolightUpdate'));
         $this->apiProductsService = new ApiProducts();
     }
 
@@ -220,11 +212,6 @@ class EcolightUpdateService
 
     public function __destruct()
     {
-        // TODO: fix this
-        Log::info('Products import end');
-        $mailService = new MailService();
-        $mailService->html('<h1>Test</h1>');
-        Mail::to('zinchenko.m.42@gmail.com')->send($mailService);
-        var_dump(Error::getErrors());
+        print_r(Error::getErrors());
     }
 }
