@@ -41,7 +41,7 @@ class EcolightUpdateService
          * @var $option Option
          */
 
-        $apiProducts = $this->apiProductsService->getProducts(10);
+        $apiProducts = $this->apiProductsService->getProducts();
         $products = [];
 
         foreach ($apiProducts as $apiProduct) {
