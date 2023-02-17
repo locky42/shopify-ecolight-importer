@@ -39,6 +39,7 @@ class ApiProducts
 
         $products = [];
         $iteration = 0;
+        $noValids = [];
         foreach ($apiProducts as $apiProduct) {
             if (ProductChecker::check($apiProduct)) {
                 if ($count && $iteration >= $count) {
@@ -75,9 +76,15 @@ class ApiProducts
                 $products[] = $product;
                 ++$iteration;
             } else {
-                Log::info('Skip product ' . $apiProduct->Stone_NO . ' (no valid conditions)');
+                $noValids[] = $apiProduct->Stone_NO;
             }
         }
+
+        if (count($noValids)) {
+            Log::info('Skip ' . count($noValids) . ' products (no valid conditions)');
+            Log::info('Skip products: ' . implode(', ', $noValids));
+        }
+
         return $products;
     }
 
