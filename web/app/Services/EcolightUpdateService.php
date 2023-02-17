@@ -41,7 +41,7 @@ class EcolightUpdateService
          * @var $option Option
          */
 
-        $apiProducts = $this->apiProductsService->getProducts();
+        $apiProducts = $this->apiProductsService->getProducts(10);
         $products = [];
 
         foreach ($apiProducts as $apiProduct) {
@@ -107,21 +107,27 @@ class EcolightUpdateService
             $authSession->setAccessToken($session->access_token);
             SessionHelper::setSession($authSession);
             foreach ($this->getProducts() as $product) {
+                $productLocalSku = null;
+                $productLocalId = 0;
+                $productLocalHash = null;
                 try {
                     if (is_object($product)) {
                         $product = $product->toArray();
                     }
 
                     $productHash = md5(serialize($product));
+                    $productLocalHash = $productHash;
                     foreach ($product['variants'] as $variant) {
                         $sku = $variant['variantSku'] ?? $variant['sku'];
-                        $localProduct = Products::getShopifyProduct($sku);
+                        $productLocalSku = $sku;
+                        $localProduct = Products::getShopifyProductByHash($productHash);
                         $localProductArray = $localProduct?->toArray();
                         if ($localProductArray) {
                             if ($localProductArray['product_hash'] == $productHash) {
                                 Log::info('Product ' . $sku . ' (id:' . $localProductArray['product_id'] . ') already exist');
                             } else {
                                 $productId = $localProductArray['product_id'];
+                                $productLocalId = $productId;
                                 Log::info('Update ' . $sku . ' product (id:' . $productId . ')');
                                 $result = $this->sendProduct($product, $productId);
                                 if (isset($result->errors)) {
@@ -135,15 +141,18 @@ class EcolightUpdateService
                             $result = $this->sendProduct($product);
 
                             $productId = $result->id;
+                            $productLocalId = (int) $productId;
                             Log::info("Product $sku has id $productId");
                             if ($productId) {
                                 Products::addWriteLocalProduct($sku, $productId, $productHash);
                             }
                         }
                     }
+                    $productLocalSku = null;
                 } catch (ExceptionToMail $exception) {
                     Log::error($exception->getMessage());
                     Error::addError($exception->getMessage());
+                    Products::addWriteLocalProduct($productLocalSku, $productLocalId, $productLocalHash);
                 } catch (Exception $exception) {
                     Error::addError($exception->getMessage());
                 }

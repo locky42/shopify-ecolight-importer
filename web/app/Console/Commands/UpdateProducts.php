@@ -44,7 +44,6 @@ class UpdateProducts extends Command
      */
     public function handle(): int
     {
-//        throw new Exception('test1');
         $updateService = new EcolightUpdateService();
         $updateService->import();
 
