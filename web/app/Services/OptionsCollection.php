@@ -19,10 +19,14 @@ class OptionsCollection
     public function add($product, string $key): self
     {
         $option = new Option;
-        $option
-            ->setName($key)
-            ->setValue($product->{$key});
-        $this->collection[] = $option;
+        $value = $product->{$key};
+        if ($value) {
+            $option
+                ->setName($key)
+                ->setValue($product->{$key});
+            $this->collection[] = $option;
+        }
+
         return $this;
     }
 
