@@ -103,6 +103,7 @@ class EcolightUpdateService
         $sessions = $sessionModel::all();
 
         foreach ($sessions as $session) {
+            $countExist = 0;
             $authSession = new AuthSession($session->id, $session->shop, $session->is_online ?? $session->isOnline, $session->state);
             $authSession->setAccessToken($session->access_token);
             SessionHelper::setSession($authSession);
@@ -124,7 +125,8 @@ class EcolightUpdateService
                         $localProductArray = $localProduct?->toArray();
                         if ($localProductArray) {
                             if ($localProductArray['product_hash'] == $productHash) {
-                                Log::info('Product ' . $sku . ' (id:' . $localProductArray['product_id'] . ') already exist');
+                                $countExist++;
+//                                Log::info('Product ' . $sku . ' (id:' . $localProductArray['product_id'] . ') already exist');
                             } else {
                                 $productId = $localProductArray['product_id'];
                                 $productLocalId = $productId;
@@ -157,6 +159,11 @@ class EcolightUpdateService
                     Error::addError($exception->getMessage());
                 }
             }
+
+            if ($countExist) {
+                Log::info("Skip $countExist products (already exist)");
+            }
+
             break;
         }
     }
