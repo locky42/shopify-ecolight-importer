@@ -55,6 +55,9 @@ class ClearProductsService
         foreach ($products as $productId) {
             ApiShopifyProduct::removeProduct($productId);
         }
-        Log::info('Remove ' . count($products) . ' products (not exist in vendor api)');
+
+        if (count($products)) {
+            Log::info('Remove ' . count($products) . ' products (not exist in vendor api)');
+        }
     }
 }

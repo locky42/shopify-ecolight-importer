@@ -183,7 +183,7 @@ class EcolightUpdateService
                 $productId = $localProductArray['product_id'];
                 $productLocalId = $productId;
                 Log::info('Update ' . $sku . ' product (id:' . $productId . ')');
-                $result = ApiShopifyProduct::sendProduct($product, $productId);
+                $result = ApiShopifyProduct::sendProduct($product, $sku, $productId);
                 if (isset($result->errors)) {
                     Log::debug(var_export($result, true));
                     throw new Exception(var_export($result, true));
@@ -191,15 +191,16 @@ class EcolightUpdateService
                 Products::addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
             }
         } else {
-            Log::info('Insert ' . $sku);
-            $result = ApiShopifyProduct::sendProduct($product);
+            $result = ApiShopifyProduct::sendProduct($product, $sku);
 
             $productId = $result?->id;
             $productLocalId = (int) $productId;
-            Log::info("Product $sku has id $productId");
+
             if ($productId) {
-                Products::addWriteLocalProduct($sku, $productId, $productHash);
+                Log::info("Product $sku has id $productId");
             }
+
+            Products::addWriteLocalProduct($sku, (int) $productId, $productHash);
         }
     }
 

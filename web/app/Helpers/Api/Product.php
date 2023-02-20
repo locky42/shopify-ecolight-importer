@@ -16,15 +16,16 @@ class Product
 {
     /**
      * @param $product
+     * @param string $sku
      * @param $productId
-     * @return ShopifyProduct
+     * @return ShopifyProduct|null
      * @throws ExceptionToMail
      * @throws HttpRequestException
      * @throws MissingArgumentException
      * @throws RestResourceException
      * @throws RestResourceRequestException
      */
-    public static function sendProduct($product, $productId = null): ShopifyProduct
+    public static function sendProduct($product, string $sku, $productId = null): ?ShopifyProduct
     {
         $shopifyProduct = new ShopifyProduct(Session::get());
         $productId = $productId ? : Variant::getShopifyProductIdByVariantsBySku(
@@ -47,31 +48,48 @@ class Product
             $shopifyProduct->status = ProductConstants::STATUS_DRAFT;
         }
 
-        try {
-            $shopifyProduct->saveAndUpdate();
-        } catch (RestResourceRequestException $exception) {
-            if ($exception->getMessage() == 'REST request failed: "Not Found"' && $productId) {
-                Products::getShopifyProductById($productId)?->delete();
-                self::sendProduct($product);
-            } else {
+        if ($shopifyProduct->id && $shopifyProduct->status != ProductConstants::STATUS_DRAFT) {
+            try {
+                $shopifyProduct->saveAndUpdate();
+                Log::info('Insert ' . $sku);
+            } catch (RestResourceRequestException $exception) {
+                if ($exception->getMessage() == 'REST request failed: "Not Found"' && $productId) {
+                    Products::getShopifyProductById($productId)?->delete();
+                    self::sendProduct($product, $sku);
+                } else {
+                    throw $exception;
+                }
+            }
+
+            Collection::setProductCollection($shopifyProduct, $product);
+            try {
+                Image::setProductImages($shopifyProduct, $product);
+            } catch (ExceptionToMail $exception) {
+                Log::error(implode(' | ', [
+                    $exception->getMessage(),
+                    $exception->getFile() . ':' . $exception->getLine()
+                ]));
+                Log::warning("Delete product $sku (id:$shopifyProduct->id)");
+                ShopifyProduct::delete(Session::get(), $shopifyProduct->id);
                 throw $exception;
             }
-        }
 
-        Collection::setProductCollection($shopifyProduct, $product);
-        try {
-            Image::setProductImages($shopifyProduct, $product);
-        } catch (ExceptionToMail $exception) {
-            Log::error(implode(' | ', [
-                $exception->getMessage(),
-                $exception->getFile() . ':' . $exception->getLine()
-            ]));
-            Log::warning('Delete product ' . $shopifyProduct->title . ' (id:' . $shopifyProduct->id . ')');
-            ShopifyProduct::delete(Session::get(), $shopifyProduct->id);
-            throw $exception;
-        }
+            return $shopifyProduct;
+        } elseif ($shopifyProduct->id) {
+            $localProduct = Products::getShopifyProductById($productId);
+            if ($localProduct) {
+                $localProduct->setAttribute('product_id', 0);
+                $localProduct->save();
+                Log::info("Delete product $sku ($productId) from DB");
+                ShopifyProduct::delete(Session::get(), $shopifyProduct->id);
+            }
 
-        return $shopifyProduct;
+            return null;
+        } else {
+            Log::info("Skip product $sku (status is not active)");
+
+            return null;
+        }
     }
 
     /**
@@ -81,6 +99,7 @@ class Product
     public static function removeProduct($productId): ?array
     {
         Products::getShopifyProductById($productId)?->delete();
+
         return ShopifyProduct::delete(Session::get(), $productId);
     }
 }
