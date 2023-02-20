@@ -4,11 +4,10 @@ namespace App\Services;
 
 use Exception;
 use App\Exceptions\ExceptionToMail;
-use App\Models\Option;
-use App\Helpers\Api\Image;
-use App\Helpers\Api\Variant;
-use App\Helpers\Api\Collection;
+use App\Helpers\Api\Product as ApiShopifyProduct;
 use App\Helpers\Error;
+use App\Helpers\Api\Session as SessionHelper;
+use App\Models\Option;
 use App\Models\Session;
 use App\Models\Products;
 use App\Models\ShopifyProduct;
@@ -16,9 +15,7 @@ use Shopify\Exception\HttpRequestException;
 use Shopify\Exception\MissingArgumentException;
 use Shopify\Exception\RestResourceException;
 use Shopify\Exception\RestResourceRequestException;
-use Shopify\Rest\Admin2023_01\Product;
 use Shopify\Auth\Session as AuthSession;
-use App\Helpers\Api\Session as SessionHelper;
 use Illuminate\Support\Facades\Log;
 
 class EcolightUpdateService
@@ -107,7 +104,8 @@ class EcolightUpdateService
             $authSession = new AuthSession($session->id, $session->shop, $session->is_online ?? $session->isOnline, $session->state);
             $authSession->setAccessToken($session->access_token);
             SessionHelper::setSession($authSession);
-            foreach ($this->getProducts() as $product) {
+            $products = $this->getProducts();
+            foreach ($products as $product) {
                 $productLocalSku = null;
                 $productLocalId = 0;
                 $productLocalHash = null;
@@ -131,7 +129,7 @@ class EcolightUpdateService
                                 $productId = $localProductArray['product_id'];
                                 $productLocalId = $productId;
                                 Log::info('Update ' . $sku . ' product (id:' . $productId . ')');
-                                $result = $this->sendProduct($product, $productId);
+                                $result = ApiShopifyProduct::sendProduct($product, $productId);
                                 if (isset($result->errors)) {
                                     Log::debug(var_export($result, true));
                                     throw new Exception(var_export($result, true));
@@ -140,7 +138,7 @@ class EcolightUpdateService
                             }
                         } else {
                             Log::info('Insert ' . $sku);
-                            $result = $this->sendProduct($product);
+                            $result = ApiShopifyProduct::sendProduct($product);
 
                             $productId = $result->id;
                             $productLocalId = (int) $productId;
@@ -156,7 +154,7 @@ class EcolightUpdateService
                     Error::addError($exception->getMessage());
                     Products::addWriteLocalProduct($productLocalSku, $productLocalId, $productLocalHash);
                 } catch (Exception $exception) {
-                    Error::addError($exception->getMessage());
+                    Error::addError($exception->getMessage() . ' | ' . $exception->getFile() . ':' . $exception->getLine());
                 }
             }
 
@@ -164,71 +162,34 @@ class EcolightUpdateService
                 Log::info("Skip $countExist products (already exist)");
             }
 
+            try {
+                $this->clearProducts($products);
+            } catch (Exception $exception) {
+                Error::addError($exception->getMessage());
+            }
+
             break;
         }
     }
 
     /**
-     * @param $product
-     * @param $productId
-     * @return Product
-     * @throws ExceptionToMail
-     * @throws HttpRequestException
-     * @throws MissingArgumentException
-     * @throws RestResourceException
-     * @throws RestResourceRequestException
+     * @param array $apiProducts
+     * @return void
      */
-    protected function sendProduct($product, $productId = null): Product
+    protected function clearProducts(array $apiProducts): void
     {
-        $shopifyProduct = new Product(SessionHelper::get());
-        $productId = $productId ? : Variant::getShopifyProductIdByVariantsBySku($product['variants'][0]['sku']);
-        if ($productId) {
-            $shopifyProduct->id = $productId;
-        }
-
-        $shopifyProduct->title = $product['title'];
-        $shopifyProduct->body_html = $product['body_html'];
-        $shopifyProduct->vendor = $product['vendor'];
-        $shopifyProduct->product_type = $product['product_type'];
-        $shopifyProduct->variants = $product['variants'];
-        $shopifyProduct->options = $product['options'];
-        $shopifyProduct->handle = $product['handle'];
-        $shopifyProduct->metafields_global_title_tag = $product['seo_title'];
-        $shopifyProduct->metafields_global_description_tag = $product['seo_description'];
-        if (!$product['published']) {
-            $shopifyProduct->status = 'draft';
-        }
-
-        try {
-            $shopifyProduct->saveAndUpdate();
-        } catch (RestResourceRequestException $exception) {
-            if ($exception->getMessage() == 'REST request failed: "Not Found"' && $productId) {
-                Products::getShopifyProductById($productId)?->delete();
-                $this->sendProduct($product);
-            } else {
-                throw $exception;
-            }
-        }
-
-        Collection::setProductCollection($shopifyProduct, $product);
-        try {
-            Image::setProductImages($shopifyProduct, $product);
-        } catch (ExceptionToMail $exception) {
-            Log::error(implode(' | ', [
-                $exception->getMessage(),
-                $exception->getFile() . ':' . $exception->getLine()
-            ]));
-            Log::warning('Delete product ' . $shopifyProduct->title . ' (id:' . $shopifyProduct->id . ')');
-            Product::delete(SessionHelper::get(), $shopifyProduct->id);
-            throw $exception;
-        }
-
-        return $shopifyProduct;
+        $clearProductsService = new ClearProductsService();
+        $clearProductsService
+            ->setProductsFromApi($apiProducts)
+            ->execute();
     }
 
     public function __destruct()
     {
+        if (!empty(Error::getErrors())) {
+            Log::warning(var_export(Error::getErrors(), true));
+        }
+
         Log::info('Import END');
-        print_r(Error::getErrors());
     }
 }

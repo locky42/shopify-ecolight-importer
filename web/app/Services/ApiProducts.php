@@ -38,7 +38,7 @@ class ApiProducts
         Log::info('Get all products from API (' . count($apiProducts) . ')');
 
         $products = [];
-        $iteration = 0;
+        $iteration = 1;
         $noValids = [];
         foreach ($apiProducts as $apiProduct) {
             if (ProductChecker::check($apiProduct)) {
