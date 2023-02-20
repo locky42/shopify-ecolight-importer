@@ -21,7 +21,20 @@ use Illuminate\Support\Facades\Log;
 
 class EcolightUpdateService
 {
+    /**
+     * @var ApiProducts
+     */
     protected ApiProducts $apiProductsService;
+
+    /**
+     * @var int
+     */
+    protected int $countExist = 0;
+
+    /**
+     * @var string|null
+     */
+    protected ?string $productLocalSku = null;
 
     public function __construct()
     {
@@ -39,7 +52,7 @@ class EcolightUpdateService
          * @var $option Option
          */
 
-        $apiProducts = $this->apiProductsService->getProducts();
+        $apiProducts = $this->apiProductsService->getProducts(8);
         $products = [];
 
         foreach ($apiProducts as $apiProduct) {
@@ -48,7 +61,7 @@ class EcolightUpdateService
 
             foreach ($apiProduct->options as $iteration => $option) {
                 if ($option->value) {
-                    $variantsOptions["option" . $iteration + 1] = $option->value;
+                    $variantsOptions['option' . $iteration + 1] = $option->value;
                     $options[] = ['name' => $option->name];
                 }
             }
@@ -101,13 +114,12 @@ class EcolightUpdateService
         $sessions = $sessionModel::all();
 
         foreach ($sessions as $session) {
-            $countExist = 0;
             $authSession = new AuthSession($session->id, $session->shop, $session->is_online ?? $session->isOnline, $session->state);
             $authSession->setAccessToken($session->access_token);
             SessionHelper::setSession($authSession);
             $products = $this->getProducts();
             foreach ($products as $product) {
-                $productLocalSku = null;
+                $this->productLocalSku = null;
                 $productLocalId = 0;
                 $productLocalHash = null;
                 try {
@@ -118,49 +130,20 @@ class EcolightUpdateService
                     $productHash = md5(serialize($product));
                     $productLocalHash = $productHash;
                     foreach ($product[ProductConstants::PRODUCT_VARIANTS] as $variant) {
-                        $sku = $variant['variantSku'] ?? $variant[ProductConstants::PRODUCT_VARIANT_SKU];
-                        $productLocalSku = $sku;
-                        $localProduct = Products::getShopifyProductByHash($productHash);
-                        $localProductArray = $localProduct?->toArray();
-                        if ($localProductArray) {
-                            if ($localProductArray['product_hash'] == $productHash) {
-                                $countExist++;
-//                                Log::info('Product ' . $sku . ' (id:' . $localProductArray['product_id'] . ') already exist');
-                            } else {
-                                $productId = $localProductArray['product_id'];
-                                $productLocalId = $productId;
-                                Log::info('Update ' . $sku . ' product (id:' . $productId . ')');
-                                $result = ApiShopifyProduct::sendProduct($product, $productId);
-                                if (isset($result->errors)) {
-                                    Log::debug(var_export($result, true));
-                                    throw new Exception(var_export($result, true));
-                                }
-                                Products::addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
-                            }
-                        } else {
-                            Log::info('Insert ' . $sku);
-                            $result = ApiShopifyProduct::sendProduct($product);
-
-                            $productId = $result?->id;
-                            $productLocalId = (int) $productId;
-                            Log::info("Product $sku has id $productId");
-                            if ($productId) {
-                                Products::addWriteLocalProduct($sku, $productId, $productHash);
-                            }
-                        }
+                        $this->saveProduct($product, $variant, $productHash, $productLocalId);
                     }
-                    $productLocalSku = null;
+                    $this->productLocalSku = null;
                 } catch (ExceptionToMail $exception) {
                     Log::error($exception->getMessage());
                     Error::addError($exception->getMessage());
-                    Products::addWriteLocalProduct($productLocalSku, $productLocalId, $productLocalHash);
+                    Products::addWriteLocalProduct($this->productLocalSku, $productLocalId, $productLocalHash);
                 } catch (Exception $exception) {
                     Error::addError($exception->getMessage() . ' | ' . $exception->getFile() . ':' . $exception->getLine());
                 }
             }
 
-            if ($countExist) {
-                Log::info("Skip $countExist products (already exist)");
+            if ($this->countExist) {
+                Log::info("Skip $this->countExist products (already exist)");
             }
 
             try {
@@ -170,6 +153,53 @@ class EcolightUpdateService
             }
 
             break;
+        }
+    }
+
+    /**
+     * @param $product
+     * @param $variant
+     * @param $productHash
+     * @param $productLocalId
+     * @return void
+     * @throws ExceptionToMail
+     * @throws HttpRequestException
+     * @throws MissingArgumentException
+     * @throws RestResourceException
+     * @throws RestResourceRequestException
+     */
+    protected function saveProduct($product, $variant, $productHash, &$productLocalId): void
+    {
+        $sku = $variant['variantSku'] ?? $variant[ProductConstants::PRODUCT_VARIANT_SKU];
+        $this->productLocalSku = $sku;
+        $localProduct = Products::getShopifyProductByHash($productHash);
+        $localProductArray = $localProduct?->toArray();
+
+        if ($localProductArray) {
+            if ($localProductArray['product_hash'] == $productHash) {
+                $this->countExist++;
+//                Log::info('Product ' . $sku . ' (id:' . $localProductArray['product_id'] . ') already exist');
+            } else {
+                $productId = $localProductArray['product_id'];
+                $productLocalId = $productId;
+                Log::info('Update ' . $sku . ' product (id:' . $productId . ')');
+                $result = ApiShopifyProduct::sendProduct($product, $productId);
+                if (isset($result->errors)) {
+                    Log::debug(var_export($result, true));
+                    throw new Exception(var_export($result, true));
+                }
+                Products::addWriteLocalProduct($sku, $productId, $productHash, $localProduct);
+            }
+        } else {
+            Log::info('Insert ' . $sku);
+            $result = ApiShopifyProduct::sendProduct($product);
+
+            $productId = $result?->id;
+            $productLocalId = (int) $productId;
+            Log::info("Product $sku has id $productId");
+            if ($productId) {
+                Products::addWriteLocalProduct($sku, $productId, $productHash);
+            }
         }
     }
 
