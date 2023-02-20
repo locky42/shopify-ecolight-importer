@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\ProductConstants;
 use App\Models\Products;
 use App\Helpers\Api\Product as ApiShopifyProduct;
 use Illuminate\Support\Facades\Log;
@@ -37,8 +38,8 @@ class ClearProductsService
     public function setProductsFromApi(array $products): self
     {
         foreach ($products as $apiProduct) {
-            foreach ($apiProduct['variants'] as $variant) {
-                $this->apiProducts[$variant['sku']] = true;
+            foreach ($apiProduct[ProductConstants::PRODUCT_VARIANTS] as $variant) {
+                $this->apiProducts[$variant[ProductConstants::PRODUCT_VARIANT_SKU]] = true;
             }
         }
 

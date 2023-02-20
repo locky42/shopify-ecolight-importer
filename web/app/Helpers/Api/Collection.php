@@ -2,9 +2,9 @@
 
 namespace App\Helpers\Api;
 
+use App\Helpers\ProductConstants;
 use Shopify\Exception\RestResourceException;
 use Shopify\Rest\Admin2023_01\CustomCollection;
-//use Shopify\Rest\Admin2023_01\Collect;
 use Shopify\Rest\Admin2023_01\Product;
 
 class Collection
@@ -51,7 +51,7 @@ class Collection
         self::setShopifyProduct($shopifyProduct);
         $collections = self::getAllCollections();
 
-        $collection = $collections[strtoupper($productData['collection'])] ?? self::createCollection();
+        $collection = $collections[strtoupper($productData[ProductConstants::PRODUCT_COLLECTION])] ?? self::createCollection();
         self::addProductToCollection($collection);
     }
 
@@ -103,7 +103,7 @@ class Collection
     protected static function createCollection(): CustomCollection
     {
         $collection = new CustomCollection(Session::get());
-        $collection->title = self::$productData['collection'];
+        $collection->title = self::$productData[ProductConstants::PRODUCT_COLLECTION];
         $collection->save(true);
 
         return $collection;

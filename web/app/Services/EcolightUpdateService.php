@@ -6,6 +6,7 @@ use Exception;
 use App\Exceptions\ExceptionToMail;
 use App\Helpers\Api\Product as ApiShopifyProduct;
 use App\Helpers\Error;
+use App\Helpers\ProductConstants;
 use App\Helpers\Api\Session as SessionHelper;
 use App\Models\Option;
 use App\Models\Session;
@@ -54,29 +55,29 @@ class EcolightUpdateService
 
             $variants = [
                 array_merge([
-                    "sku"     => $apiProduct->variantSku,
-                    "price"   => $apiProduct->variantPrice,
-                    "grams"   => $apiProduct->variantGrams,
-                    "taxable" => $apiProduct->variantTaxable,
+                    ProductConstants::PRODUCT_VARIANT_SKU => $apiProduct->variantSku,
+                    ProductConstants::PRODUCT_VARIANT_PRICE => $apiProduct->variantPrice,
+                    ProductConstants::PRODUCT_VARIANT_GRAMS => $apiProduct->variantGrams,
+                    ProductConstants::PRODUCT_VARIANT_TAXABLE => $apiProduct->variantTaxable,
                 ], $variantsOptions),
             ];
 
             $product = [
-                'title' => $apiProduct->title,
-                'body_html' => $apiProduct->bodyHtml,
-                'seo_title' => $apiProduct->seoTitle,
-                'seo_description' => $apiProduct->seoDescription,
-                'handle' => $apiProduct->handle,
-                'vendor' => $apiProduct->vendor,
-                'product_type' => $apiProduct->customProductType,
-                'published' => $apiProduct->status == $apiProduct::STATUS_ACTIVE,
-                'variants' => $variants,
-                'options' => $options,
-                'collection' => $apiProduct->collection,
-                'images' => [
+                ProductConstants::PRODUCT_TITLE => $apiProduct->title,
+                ProductConstants::PRODUCT_BODY_HTML => $apiProduct->bodyHtml,
+                ProductConstants::PRODUCT_SEO_TITLE => $apiProduct->seoTitle,
+                ProductConstants::PRODUCT_SEO_DESCRIPTION => $apiProduct->seoDescription,
+                ProductConstants::PRODUCT_HANDLE => $apiProduct->handle,
+                ProductConstants::PRODUCT_VENDOR => $apiProduct->vendor,
+                ProductConstants::PRODUCT_TYPE => $apiProduct->customProductType,
+                ProductConstants::PRODUCT_PUBLISHED => $apiProduct->status == ProductConstants::STATUS_ACTIVE,
+                ProductConstants::PRODUCT_VARIANTS => $variants,
+                ProductConstants::PRODUCT_OPTIONS => $options,
+                ProductConstants::PRODUCT_COLLECTION => $apiProduct->collection,
+                ProductConstants::PRODUCT_IMAGES => [
                     [
-                        'src' => $apiProduct->imageSrc,
-                        'alt' => $apiProduct->imageAltText
+                        ProductConstants::PRODUCT_IMAGE_SRC => $apiProduct->imageSrc,
+                        ProductConstants::PRODUCT_IMAGE_ALT => $apiProduct->imageAltText
                     ]
                 ],
             ];
@@ -116,8 +117,8 @@ class EcolightUpdateService
 
                     $productHash = md5(serialize($product));
                     $productLocalHash = $productHash;
-                    foreach ($product['variants'] as $variant) {
-                        $sku = $variant['variantSku'] ?? $variant['sku'];
+                    foreach ($product[ProductConstants::PRODUCT_VARIANTS] as $variant) {
+                        $sku = $variant['variantSku'] ?? $variant[ProductConstants::PRODUCT_VARIANT_SKU];
                         $productLocalSku = $sku;
                         $localProduct = Products::getShopifyProductByHash($productHash);
                         $localProductArray = $localProduct?->toArray();
@@ -140,7 +141,7 @@ class EcolightUpdateService
                             Log::info('Insert ' . $sku);
                             $result = ApiShopifyProduct::sendProduct($product);
 
-                            $productId = $result->id;
+                            $productId = $result?->id;
                             $productLocalId = (int) $productId;
                             Log::info("Product $sku has id $productId");
                             if ($productId) {

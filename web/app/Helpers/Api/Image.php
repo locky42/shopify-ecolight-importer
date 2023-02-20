@@ -7,6 +7,7 @@ use Shopify\Exception\RestResourceException;
 use Shopify\Rest\Admin2023_01\Image as CoreImage;
 use Shopify\Rest\Admin2023_01\Product;
 use App\Exceptions\ExceptionToMail;
+use App\Helpers\ProductConstants;
 
 class Image
 {
@@ -21,18 +22,18 @@ class Image
     {
         self::removeProductImages($shopifyProduct);
 
-        foreach ($productData['images'] as $iteration => $imageData) {
+        foreach ($productData[ProductConstants::PRODUCT_IMAGES] as $iteration => $imageData) {
             $image = new CoreImage(Session::get());
             $image->product_id = $shopifyProduct->id;
             $image->position = $iteration + 1;
-            $image->alt = $imageData['alt'] ?? '';
-            $image->src = $imageData['src'];
+            $image->alt = $imageData[ProductConstants::PRODUCT_IMAGE_ALT] ?? '';
+            $image->src = $imageData[ProductConstants::PRODUCT_IMAGE_SRC];
             try {
                 if ($image->src) {
                     $image->save(true);
                 }
             } catch (Exception $exception) {
-                throw new ExceptionToMail('Import image error (product ' . $productData['title'] . '): ' . $exception->getMessage());
+                throw new ExceptionToMail('Import image error (product ' . $productData[ProductConstants::PRODUCT_TITLE] . '): ' . $exception->getMessage());
             }
         }
     }

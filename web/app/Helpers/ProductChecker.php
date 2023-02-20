@@ -2,8 +2,6 @@
 
 namespace App\Helpers;
 
-use App\Models\ShopifyProduct;
-
 class ProductChecker
 {
     const ALLOWED_SHAPE = [
@@ -38,6 +36,6 @@ class ProductChecker
      */
     public static function getStatus($product): string
     {
-        return strtolower($product->StockStatus) == 'available' ? ShopifyProduct::STATUS_ACTIVE : ShopifyProduct::STATUS_DRAFT;
+        return strtolower($product->StockStatus) == 'available' ? ProductConstants::STATUS_ACTIVE : ProductConstants::STATUS_DRAFT;
     }
 }

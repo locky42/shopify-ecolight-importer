@@ -3,6 +3,7 @@
 namespace App\Helpers\Api;
 
 use App\Exceptions\ExceptionToMail;
+use App\Helpers\ProductConstants;
 use App\Models\Products;
 use Illuminate\Support\Facades\Log;
 use Shopify\Exception\HttpRequestException;
@@ -26,22 +27,24 @@ class Product
     public static function sendProduct($product, $productId = null): ShopifyProduct
     {
         $shopifyProduct = new ShopifyProduct(Session::get());
-        $productId = $productId ? : Variant::getShopifyProductIdByVariantsBySku($product['variants'][0]['sku']);
+        $productId = $productId ? : Variant::getShopifyProductIdByVariantsBySku(
+            $product[ProductConstants::PRODUCT_VARIANTS][0][ProductConstants::PRODUCT_VARIANT_SKU]
+        );
         if ($productId) {
             $shopifyProduct->id = $productId;
         }
 
-        $shopifyProduct->title = $product['title'];
-        $shopifyProduct->body_html = $product['body_html'];
-        $shopifyProduct->vendor = $product['vendor'];
-        $shopifyProduct->product_type = $product['product_type'];
-        $shopifyProduct->variants = $product['variants'];
-        $shopifyProduct->options = $product['options'];
-        $shopifyProduct->handle = $product['handle'];
-        $shopifyProduct->metafields_global_title_tag = $product['seo_title'];
-        $shopifyProduct->metafields_global_description_tag = $product['seo_description'];
-        if (!$product['published']) {
-            $shopifyProduct->status = 'draft';
+        $shopifyProduct->title = $product[ProductConstants::PRODUCT_TITLE];
+        $shopifyProduct->body_html = $product[ProductConstants::PRODUCT_BODY_HTML];
+        $shopifyProduct->vendor = $product[ProductConstants::PRODUCT_VENDOR];
+        $shopifyProduct->product_type = $product[ProductConstants::PRODUCT_TYPE];
+        $shopifyProduct->variants = $product[ProductConstants::PRODUCT_VARIANTS];
+        $shopifyProduct->options = $product[ProductConstants::PRODUCT_OPTIONS];
+        $shopifyProduct->handle = $product[ProductConstants::PRODUCT_HANDLE];
+        $shopifyProduct->metafields_global_title_tag = $product[ProductConstants::PRODUCT_SEO_TITLE];
+        $shopifyProduct->metafields_global_description_tag = $product[ProductConstants::PRODUCT_SEO_DESCRIPTION];
+        if (!$product[ProductConstants::PRODUCT_PUBLISHED]) {
+            $shopifyProduct->status = ProductConstants::STATUS_DRAFT;
         }
 
         try {
