@@ -138,7 +138,7 @@ class EcolightUpdateService
                     Error::addError($exception->getMessage());
                     Products::addWriteLocalProduct($this->productLocalSku, $productLocalId, $productLocalHash);
                 } catch (Exception $exception) {
-                    Error::addError($exception->getMessage() . ' | ' . $exception->getFile() . ':' . $exception->getLine());
+                    Error::exception($exception);
                 }
             }
 
@@ -149,7 +149,7 @@ class EcolightUpdateService
             try {
                 $this->clearProducts($products);
             } catch (Exception $exception) {
-                Error::addError($exception->getMessage());
+                Error::exception($exception);
             }
 
             break;

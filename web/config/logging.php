@@ -51,7 +51,14 @@ return [
             'driver' => 'single',
             'path' => storage_path('logs/apiImport.log'),
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 3,
+            'days' => 7,
+        ],
+
+        'apiImportError' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/apiImportError.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 7,
         ],
 
         'daily' => [

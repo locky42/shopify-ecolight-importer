@@ -2,6 +2,9 @@
 
 namespace App\Helpers;
 
+use Exception;
+use Illuminate\Support\Facades\Log;
+
 class Error
 {
     /**
@@ -24,5 +27,21 @@ class Error
     public static function getErrors(): array
     {
         return self::$errors;
+    }
+
+    /**
+     * @param Exception $exception
+     * @return void
+     */
+    public static function exception(Exception $exception): void
+    {
+        Log::channel('apiImportError')->error(
+            $exception->getMessage() .
+            PHP_EOL .
+            $exception->getFile() .
+            ':' . $exception->getLine() .
+            PHP_EOL .
+            $exception->getTraceAsString()
+        );
     }
 }
