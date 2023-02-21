@@ -6,6 +6,7 @@ use App\Helpers\ProductConstants;
 use App\Models\Products;
 use App\Helpers\Api\Product as ApiShopifyProduct;
 use Illuminate\Support\Facades\Log;
+use Shopify\Exception\RestResourceRequestException;
 
 class ClearProductsService
 {
@@ -48,12 +49,21 @@ class ClearProductsService
 
     /**
      * @return void
+     * @throws RestResourceRequestException
      */
     public function execute(): void
     {
         $products = array_diff_key($this->localProducts, $this->apiProducts);
         foreach ($products as $productId) {
-            ApiShopifyProduct::removeProduct($productId);
+            try {
+                ApiShopifyProduct::removeProduct($productId);
+            } catch (RestResourceRequestException $exception) {
+                if ($exception->getMessage() == 'REST request failed: "Not Found"') {
+                    Products::getShopifyProductById($productId)?->delete();
+                } else {
+                    throw $exception;
+                }
+            }
         }
 
         if (count($products)) {
