@@ -20,7 +20,7 @@ class Collect
     {
         if (empty(self::$collects) || $force) {
             self::$collects = CoreCollect::all(Session::get());
-            sleep(1);
+            usleep(500000);
         }
 
         return self::$collects;
@@ -52,7 +52,7 @@ class Collect
         $collect->collection_id = $collection_id;
 
         $collect->save(true);
-        sleep(1);
+        usleep(500000);
     }
 
     /**
@@ -65,6 +65,6 @@ class Collect
             Session::get(),
             $collectId
         );
-        sleep(1);
+        usleep(500000);
     }
 }

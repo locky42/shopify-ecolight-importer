@@ -50,7 +50,7 @@ class Collection
         self::setProductData($productData);
         self::setShopifyProduct($shopifyProduct);
         $collections = self::getAllCollections();
-        sleep(1);
+        usleep(500000);
         $collection = $collections[strtoupper($productData[ProductConstants::PRODUCT_COLLECTION])] ?? self::createCollection();
         self::addProductToCollection($collection);
     }
@@ -61,7 +61,7 @@ class Collection
     protected static function getAllCollections(): array
     {
         $allCollections = CustomCollection::all(Session::get());
-        sleep(1);
+        usleep(500000);
 
         $collections = [];
 
