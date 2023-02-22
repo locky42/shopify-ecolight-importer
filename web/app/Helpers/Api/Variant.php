@@ -38,6 +38,7 @@ class Variant
             $parts = explode('/', $variant->node->id);
             $variantId = end($parts);
             $shopifyVariant = CoreVariant::find(Session::get(), $variantId);
+            sleep(1);
             $productId = $shopifyVariant->product_id;
             break;
         }

@@ -31,6 +31,7 @@ class Image
             try {
                 if ($image->src) {
                     $image->save(true);
+                    sleep(1);
                 }
             } catch (Exception $exception) {
                 throw new ExceptionToMail('Import image error (product ' . $productData[ProductConstants::PRODUCT_TITLE] . '): ' . $exception->getMessage());
@@ -50,6 +51,7 @@ class Image
                 $image->id,
                 ["product_id" => $shopifyProduct->id]
             );
+            sleep(1);
         }
     }
 }

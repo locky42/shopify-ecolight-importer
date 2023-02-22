@@ -52,6 +52,7 @@ class Product
             try {
                 $shopifyProduct->saveAndUpdate();
                 Log::info('Insert ' . $sku);
+                sleep(1);
             } catch (RestResourceRequestException $exception) {
                 if ($exception->getMessage() == 'REST request failed: "Not Found"' && $productId) {
                     Products::getShopifyProductById($productId)?->delete();
