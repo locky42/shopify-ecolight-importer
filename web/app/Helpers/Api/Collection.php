@@ -66,11 +66,11 @@ class Collection
         $collections = [];
 
         foreach ($allCollections as $collection) {
-            $allCollections[strtoupper($collection->title)] = $collection;
+            $collections[strtoupper($collection->title)] = $collection;
         }
 
         self::$allCollections = $collections;
-        return $collections;
+        return self::$allCollections;
     }
 
     /**
