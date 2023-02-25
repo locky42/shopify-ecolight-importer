@@ -62,8 +62,8 @@ class Product
                 }
             }
 
-            Collection::setProductCollection($shopifyProduct, $product);
             try {
+                Collection::setProductCollection($shopifyProduct, $product);
                 Image::setProductImages($shopifyProduct, $product);
             } catch (ExceptionToMail $exception) {
                 Log::error(implode(' | ', [
@@ -73,6 +73,10 @@ class Product
                 Log::warning("Delete product $sku (id:$shopifyProduct->id)");
                 ShopifyProduct::delete(Session::get(), $shopifyProduct->id);
                 throw $exception;
+            } catch (RestResourceRequestException $exception) {
+                if ($exception->getMessage() != 'REST request failed: {"product_id":["already exists in this collection"]}') {
+                    throw $exception;
+                }
             }
 
             return $shopifyProduct;
