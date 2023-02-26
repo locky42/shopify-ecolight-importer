@@ -24,6 +24,10 @@ class EnsureShopifyInstalled
         $appInstalled = $shop && Session::where('shop', $shop)->where('access_token', '<>', null)->exists();
         $isExitingIframe = preg_match("/^ExitIframe/i", $request->path());
 
-        return ($appInstalled || $isExitingIframe) ? $next($request) : ($request->query("shop") ? AuthRedirection::redirect($request) : null);
+        if (!$request->query("shop")) {
+            exit('Only for API');
+        }
+
+        return ($appInstalled || $isExitingIframe) ? $next($request) : AuthRedirection::redirect($request);
     }
 }
